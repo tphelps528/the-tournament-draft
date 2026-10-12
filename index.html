@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="The Tournament Draft: draft five tournament players, highest points per game wins.">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>The Tournament Draft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Barlow:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky scoreboard header + tabbed working views; player detail slides in from the right */
+:root{
+  --bg:#EEF1F5; --surface:#FFFFFF; --sunk:#E4E8EF; --ink:#14203A; --muted:#5A6479; --line:#D5DBE5;
+  --accent:#D4541C; --accent-soft:#FBE6DB; --accent-ink:#FFFFFF;
+  --good:#1D7F47; --good-soft:#DDF2E5; --bad:#C2271F; --bad-soft:#FBE1DF; --warn:#9A6A00;
+  --f-display:"Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --f-body:"Barlow", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"DM Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r:10px; --bar:#14203A; --bar-ink:#EEF1F5;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C121D; --surface:#141C2A; --sunk:#1B2536; --ink:#E6EBF3; --muted:#93A0B6; --line:#26324A;
+  --accent:#F0743A; --accent-soft:#3A2116; --accent-ink:#140A04;
+  --good:#46C47E; --good-soft:#15301F; --bad:#FF6259; --bad-soft:#3A1715; --warn:#E3B341; --bar:#1C273B; --bar-ink:#E6EBF3; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C121D; --surface:#141C2A; --sunk:#1B2536; --ink:#E6EBF3; --muted:#93A0B6; --line:#26324A;
+  --accent:#F0743A; --accent-soft:#3A2116; --accent-ink:#140A04;
+  --good:#46C47E; --good-soft:#15301F; --bad:#FF6259; --bad-soft:#3A1715; --warn:#E3B341; --bar:#1C273B; --bar-ink:#E6EBF3; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--f-display);font-weight:800;letter-spacing:.01em;line-height:1.05;margin:0;text-wrap:balance;text-transform:uppercase}
+h2{font-size:30px} h3{font-size:20px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.label{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+a{color:var(--accent)}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bar);color:var(--bar-ink)}
+.top-in{max-width:1240px;margin:0 auto;padding:10px 16px 0;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+.brand{display:flex;align-items:center;gap:9px;font-family:var(--f-display);font-weight:800;font-size:24px;letter-spacing:.03em;text-transform:uppercase}
+.ball{width:18px;height:18px;border-radius:50%;background:var(--accent);position:relative;overflow:hidden;flex:none}
+.ball::before,.ball::after{content:"";position:absolute;inset:0;border:1.5px solid rgba(0,0,0,.45);border-radius:50%}
+.ball::before{transform:scaleX(.45)} .ball::after{border-width:0;border-top:1.5px solid rgba(0,0,0,.45);top:50%;border-radius:0}
+.league-name{font-size:13px;opacity:.75}
+.role{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px}
+.role select{background:transparent;border:1px solid color-mix(in srgb,var(--bar-ink) 35%,transparent);border-radius:6px;padding:4px 8px;color:var(--bar-ink)}
+.role select option{color:#14203A;background:#fff}
+nav.tabs{width:100%;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav.tabs button{background:none;border:0;padding:10px 14px 11px;color:var(--bar-ink);opacity:.62;cursor:pointer;font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.05em;text-transform:uppercase;border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs button:hover{opacity:.9}
+nav.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--accent)}
+.badge-live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-left:6px;vertical-align:middle;animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.25}}
+
+main{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:22px 60px}
+.sample{font-size:12.5px;color:var(--muted);margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sample b{color:var(--warn);font-weight:600}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 20px;margin-bottom:16px}
+.head p{margin:4px 0 0;color:var(--muted);max-width:62ch}
+.head .grow{flex:1;min-width:240px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.pad{padding:16px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 13px;cursor:pointer;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field input,.field select,.inp{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 10px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.chip.good{background:var(--good-soft);color:var(--good)} .chip.bad{background:var(--bad-soft);color:var(--bad)} .chip.acc{background:var(--accent-soft);color:var(--accent)}
+.seed{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+
+/* tables */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:default}
+th.sort{cursor:pointer} th.sort:hover{color:var(--ink)} th.on{color:var(--accent)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td.r,th.r{text-align:right}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--sunk)}
+tr.taken td{opacity:.42}
+.pname{font-weight:600}
+.rank{font-family:var(--f-display);font-weight:800;font-size:19px;color:var(--muted);width:44px}
+.star{background:none;border:0;cursor:pointer;font-size:17px;line-height:1;color:var(--line);padding:2px}
+.star.on{color:var(--accent)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;padding:12px;border-bottom:1px solid var(--line)}
+.filters .inp{flex:1 1 180px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 11px;cursor:pointer;font-weight:600;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+/* draft room */
+.clock{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;background:var(--bar);color:var(--bar-ink);border-radius:var(--r);padding:16px 18px;margin-bottom:16px}
+.clock .who{font-family:var(--f-display);font-weight:800;font-size:40px;text-transform:uppercase;line-height:1}
+.clock .meta{font-size:13px;opacity:.75;margin-top:4px}
+.timer{font-family:var(--f-mono);font-size:46px;font-weight:500;font-variant-numeric:tabular-nums;min-width:4.2ch;text-align:right;line-height:1}
+.timer.over{color:var(--bad);animation:pulse 1s infinite}
+.timer.off{font-size:16px;opacity:.6}
+.upnext{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.upnext span{font-size:12px;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--bar-ink) 14%,transparent)}
+.rosters{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.roster{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--surface)}
+.roster.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.roster h4{margin:0 0 6px;font-size:14px;display:flex;justify-content:space-between}
+.slot{font-size:13px;padding:3px 0;border-top:1px dashed var(--line);display:flex;justify-content:space-between;gap:8px}
+.slot:first-of-type{border-top:0}
+.slot .e{color:var(--muted);opacity:.6}
+.order{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.order div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;gap:10px;align-items:center;background:var(--surface)}
+.order b{font-family:var(--f-display);font-size:22px;color:var(--accent);min-width:1.4em}
+.order .pending{opacity:.4}
+.pop{animation:pop .35s ease-out}
+@keyframes pop{from{transform:scale(.85);opacity:0}}
+
+/* standings */
+.stand td{vertical-align:top}
+.avg{font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1}
+.mini{font-size:12.5px;color:var(--muted);white-space:normal;min-width:260px}
+.mini span{display:inline-block;margin-right:10px}
+.mini .out{text-decoration:line-through;opacity:.6}
+.crown{color:var(--accent);font-weight:700}
+.results{display:flex;flex-direction:column}
+.res{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.res .w{font-weight:700}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(5,10,20,.45);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);z-index:41;overflow-y:auto;border-left:1px solid var(--line);padding:calc(18px + env(safe-area-inset-top,0px)) 18px calc(30px + env(safe-area-inset-bottom,0px));animation:slide .22s ease-out}
+@keyframes slide{from{transform:translateX(30px);opacity:0}}
+.drawer .x{float:right}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:14px 0}
+.tile{background:var(--sunk);border-radius:8px;padding:9px 10px}
+.tile .v{font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1.05}
+.tile .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+.chart .bar{fill:var(--accent)} .chart .ref{stroke:var(--muted);stroke-dasharray:3 3} .chart .grid{stroke:var(--line)}
+.chart .lab{fill:var(--ink);font-size:11px}
+.sec{margin-top:18px}
+.sec h3{margin-bottom:8px}
+
+/* sign in */
+.signin{max-width:400px;margin:30px auto;text-align:left}
+.signin h2{font-size:36px;margin-bottom:6px}
+
+.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px}
+.formula{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--sunk);border-radius:8px;padding:14px;font-weight:600}
+.formula .eq{font-family:var(--f-display);font-size:24px;color:var(--accent)}
+.frac{display:inline-flex;flex-direction:column;text-align:center;min-width:0}
+.frac span:first-child{border-bottom:2px solid var(--ink);padding-bottom:3px}.frac span:last-child{padding-top:3px}
+.ex{padding:12px 0;border-top:1px solid var(--line)}.ex:first-of-type{border-top:0;padding-top:0}
+.extab td,.extab th{padding:4px 8px;font-size:13.5px}.extab tr.tot td{font-weight:700;border-bottom:0}
+.calc{font-size:13.5px;color:var(--muted);text-align:right;margin-top:4px}.calc b{color:var(--ink)}
+.rules{display:grid;grid-template-columns:minmax(0,180px) minmax(0,1fr);gap:10px 18px;margin:0}
+.rules dt{font-weight:700}.rules dd{margin:0;color:var(--muted);max-width:70ch}
+@media (max-width:600px){.rules{grid-template-columns:minmax(0,1fr)}.rules dd{margin-bottom:6px}}
+.inj{color:var(--bad);font-weight:800;margin-left:2px;cursor:help}
+h2 .inj{font-size:.8em;vertical-align:super}
+.injbox{margin-top:10px;background:var(--bad-soft);color:var(--bad);border-radius:8px;padding:9px 12px;font-size:14px}
+.injbox .muted{color:var(--bad);opacity:.8}
+.ap{font-family:var(--f-mono);font-size:11px;font-weight:500;color:var(--accent)}
+.wl{display:inline-block;min-width:18px;text-align:center;border-radius:4px;font-weight:700;font-size:11.5px;padding:0 3px}
+.wl.w{background:var(--good-soft);color:var(--good)}.wl.l{background:var(--bad-soft);color:var(--bad)}
+.by{display:inline-block;font-size:10px;font-weight:700;line-height:1;padding:2px 4px;border-radius:4px;background:var(--sunk);color:var(--muted);margin-left:5px;cursor:help}
+.drawer .extab td,.drawer .extab th{padding:5px 5px;font-size:13px}
+.drawer .extab td:nth-child(2){white-space:normal}
+.trsum{font-size:12.5px;padding:8px 12px 0}
+.clock .meta{max-width:60ch}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:60;font-weight:600;font-size:14px;max-width:calc(100% - 32px);box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.note{font-size:13px;color:var(--muted);border-left:3px solid var(--accent);padding:4px 0 4px 10px;margin:10px 0}
+.stack{display:flex;flex-direction:column;gap:14px}
+.empty{padding:30px 16px;text-align:center;color:var(--muted)}
+.sub{display:none;font-size:12px;color:var(--muted);font-weight:400;margin-top:1px}
+.sortsel{display:none;flex:0 1 auto!important}
+@media (max-width:600px){
+  .hm{display:none}.sub{display:block}.sortsel{display:block}
+  td,th{padding:8px 6px}.rank{width:30px;font-size:16px}
+  .brand{font-size:20px}.role{font-size:12px}.top-in{padding-top:8px}
+  nav.tabs button{font-size:15px;padding:8px 11px 9px}
+  .stand .mini{min-width:140px}.stand .mini span{display:block;margin:0 0 2px}
+  h2{font-size:26px}.clock{grid-template-columns:1fr}.clock .who{font-size:32px}.timer{text-align:left}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.league-name{display:none}
+}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><span class="ball" aria-hidden="true"></span>The Tournament Draft</div>
+    <div class="league-name" id="leagueName"></div>
+    <label class="role" for="roleSel">Viewing as
+      <select id="roleSel">
+        <option value="commish">Commissioner</option>
+        <option value="member">Troy (member)</option>
+      </select>
+    </label>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+  </div>
+</header>
+<main id="view"></main>
+<div id="drawerHost"></div>
+<div id="toastHost"></div>
+
+<script>
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=mulberry32(2027);
+const pickR=(arr,rng=R)=>arr[Math.floor(rng()*arr.length)];
+const gauss=rng=>{let u=0,v=0;while(!u)u=rng();while(!v)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+const shuffle=(a,rng=Math.random)=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const f1=n=>(Math.round(n*10)/10).toFixed(1);
+const f2=n=>(Math.round(n*100)/100).toFixed(2);
+let toastT;function toast(msg){const h=$("#toastHost");h.innerHTML=`<div class="toast" role="status">${esc(msg)}</div>`;clearTimeout(toastT);toastT=setTimeout(()=>h.innerHTML="",2600)}
+
+/* ---------- sample data ---------- */
+const REGIONS=["East","West","South","Midwest"];
+const SCHOOLS=["Houston","Auburn","Duke","Florida","Alabama","Tennessee","St. John's","Michigan State","Texas Tech","Iowa State","Wisconsin","Kentucky","Arizona","Maryland","Purdue","Texas A&M","Clemson","Oregon","Michigan","Memphis","BYU","Ole Miss","Missouri","Illinois","Saint Mary's","UCLA","Kansas","Gonzaga","Louisville","Marquette","Creighton","UConn","Baylor","Mississippi State","Georgia","Oklahoma","Vanderbilt","Arkansas","New Mexico","Utah State","VCU","Drake","Colorado State","McNeese","Liberty","UC San Diego","Yale","Akron","Grand Canyon","High Point","Lipscomb","Troy","Wofford","UNC Wilmington","Montana","Robert Morris","Bryant","Omaha","Norfolk State","SIU Edwardsville","Mount St. Mary's","Alabama State","American","Saint Francis"];
+const FIRST=["Jalen","Marcus","Tyler","Isaiah","Caleb","Devin","Cam","Elijah","Jordan","Trey","Malik","Brody","Keegan","Dante","Owen","Xavier","Amari","Reed","Darius","Nate","Quentin","Silas","Terrence","Ayo","Mason","Luka","Rashad","Colby","Andre","Micah"];
+const LAST=["Harper","Ellison","Brooks","Whitfield","Okafor","Lindqvist","Carver","Duvall","Mensah","Pryor","Holloway","Sutton","Vance","Ruiz","Kowalski","Bishop","Tate","Abernathy","Quinn","Fofana","Navarro","Pruitt","Langford","Coleman","Reyes","Grady","Osei","Whitaker","Bell","Moreau"];
+const teams=SCHOOLS.map((name,i)=>({id:i,name,seed:Math.floor(i/4)+1,region:REGIONS[i%4],ff:false,alive:true}));
+[41,43,60,62].forEach(i=>teams[i].ff=true); // First Four teams: excluded entirely
+const CONF={"Houston":"Big 12","Auburn":"SEC","Duke":"ACC","Florida":"SEC","Alabama":"SEC","Tennessee":"SEC","St. John's":"Big East","Michigan State":"Big Ten","Texas Tech":"Big 12","Iowa State":"Big 12","Wisconsin":"Big Ten","Kentucky":"SEC","Arizona":"Big 12","Maryland":"Big Ten","Purdue":"Big Ten","Texas A&M":"SEC","Clemson":"ACC","Oregon":"Big Ten","Michigan":"Big Ten","Memphis":"American","BYU":"Big 12","Ole Miss":"SEC","Missouri":"SEC","Illinois":"Big Ten","Saint Mary's":"WCC","UCLA":"Big Ten","Kansas":"Big 12","Gonzaga":"Pac-12","Louisville":"ACC","Marquette":"Big East","Creighton":"Big East","UConn":"Big East","Baylor":"Big 12","Mississippi State":"SEC","Georgia":"SEC","Oklahoma":"SEC","Vanderbilt":"SEC","Arkansas":"SEC","New Mexico":"Mountain West","Utah State":"Pac-12","VCU":"Atlantic 10","Drake":"Missouri Valley","Colorado State":"Pac-12","McNeese":"Southland","Liberty":"Conference USA","UC San Diego":"Big West","Yale":"Ivy League","Akron":"MAC","Grand Canyon":"Mountain West","High Point":"Big South","Lipscomb":"ASUN","Troy":"Sun Belt","Wofford":"SoCon","UNC Wilmington":"CAA","Montana":"Big Sky","Robert Morris":"Horizon","Bryant":"America East","Omaha":"Summit","Norfolk State":"MEAC","SIU Edwardsville":"OVC","Mount St. Mary's":"MAAC","Alabama State":"SWAC","American":"Patriot","Saint Francis":"NEC"};
+teams.forEach(t=>t.conf=CONF[t.name]||"Independent");
+teams.slice(0,34).map(t=>({t,k:t.id+R()*12})).sort((a,b)=>a.k-b.k).slice(0,25).forEach((x,i)=>x.t.ap=i+1);
+const apTag=t=>t.ap?`<span class="ap">#${t.ap}</span> `:"";
+const POS=["G","G","G","F","F","F","C"],CLS=["Fr","So","Jr","Sr","Gr"];
+const used=new Set();
+function mkName(){let n;do{n=pickR(FIRST)+" "+pickR(LAST)}while(used.has(n));used.add(n);return n}
+function ht(pos){const b=pos==="G"?73:pos==="F"?78:82,r=pos==="C"?4:5,i=b+Math.floor(R()*r);return `${Math.floor(i/12)}-${i%12}`}
+const players=[];
+teams.forEach(t=>{
+  [13+R()*9.5,9+R()*6,6.5+R()*5].forEach(base=>{
+    const pos=pickR(POS),ppg=Math.round(base*10)/10,gp=29+Math.floor(R()*5);
+    players.push({id:players.length,name:mkName(),team:t.id,pos,cls:pickR(CLS),ht:ht(pos),gp,ppg,
+      rpg:pos==="C"?6+R()*5:pos==="F"?4+R()*4:2+R()*3, apg:pos==="G"?2.5+R()*4:0.6+R()*2.2,
+      mpg:24+R()*12, fg:(pos==="C"?47:41)+R()*12, tp:pos==="C"?18+R()*16:30+R()*12, ft:64+R()*24,
+      log:Array.from({length:5},()=>Math.max(0,Math.round(ppg+gauss(R)*5.5))),
+      tPts:0,tGp:0,tLog:[]});
+  });
+});
+const team=p=>teams[p.team];
+// sample injury report
+const INJ=[["Out","Ankle sprain"],["Day-to-day","Knee soreness"],["Questionable","Concussion protocol"],["Out","Broken hand"],["Day-to-day","Back spasms"],["Questionable","Illness"],["Out","Torn ACL, out for season"],["Day-to-day","Hamstring tightness"]];
+{const top=players.filter(p=>!teams[p.team].ff).sort((a,b)=>b.ppg-a.ppg);[4,13,22,31,47,66,90,128].forEach((k,i)=>{const [status,note]=INJ[i];top[k].inj={status,note,updated:"Mar 15"}})}
+const injMark=p=>p.inj?`<span class="inj" title="${p.inj.status}: ${esc(p.inj.note)}" aria-label="Injured: ${p.inj.status}">*</span>`:"";
+// sample schedules: last 5 results + next 3 games per team
+const BASE=new Date(2027,1,1),START_DAY=36;
+const dstr=d=>{const x=new Date(BASE);x.setDate(x.getDate()+d);return x.toLocaleDateString("en-US",{month:"short",day:"numeric"})};
+const winP=(t,o)=>1/(1+Math.exp(-(o.seed-t.seed)*0.15));
+function pickOpp(t,rng){const same=teams.filter(x=>x.conf===t.conf&&x!==t);return same.length&&rng()<.7?pickR(same,rng):pickR(teams.filter(x=>x!==t),rng)}
+function result(t,o,rng){const w=rng()<winP(t,o),a=62+Math.floor(rng()*24),b=a-1-Math.floor(rng()*14);return {w,us:w?a:b,them:w?b:a}}
+teams.forEach(t=>{
+  let d=START_DAY-1-(t.id%3===0?0:Math.floor(R()*3));const days=[];for(let k=0;k<5;k++){days.unshift(d);d-=2+Math.floor(R()*3)}
+  t.recent=days.map(day=>{const o=pickOpp(t,R);return {day,opp:o.id,home:R()<.55,...result(t,o,R)}});
+  t.upcoming=[];let u=START_DAY+Math.floor(R()*3);for(let k=0;k<3;k++){t.upcoming.push({day:u,opp:pickOpp(t,R).id,home:R()<.5});u+=2+Math.floor(R()*3)}
+});
+players.forEach(p=>{p.glog=p.log.map(pts=>({pts,reb:Math.max(0,Math.round(p.rpg+gauss(R)*2.5)),ast:Math.max(0,Math.round(p.apg+gauss(R)*1.8))}))});
+const eligible=p=>!team(p).ff;
+
+/* ---------- league + state ---------- */
+const MEMBERS=["Troy","Jake","Matt","Ryan","Kyle","Nick","Brandon","Chris","Tyler","Sam","Drew","Evan","Luke","Josh","Ben","Alex"]
+  .map((n,i)=>({id:i,name:n,email:n.toLowerCase()+"@example.com",status:"Joined"}));
+const S={
+  tab:"board", role:"commish", me:0,
+  league:{name:"The Crew Player Draft 2027",commish:"Mr. Davis (commissioner)",invited:["sean@example.com","pat@example.com"]},
+  leagues:[{name:"The Crew Player Draft 2027",role:"Member",size:16},{name:"Office Pool 2027",role:"Commissioner",size:9}],
+  watch:new Set(), signinPreview:false, signinSent:false,
+  board:{q:"",pos:"All",sort:"ppg",dir:-1},
+  draft:{status:"live",settings:{rounds:5,snake:4,timer:60,hard:false},order:[],randOrders:{},picks:[],clockStart:Date.now(),reveal:0},
+  swaps:[], // {member, out, in}
+  T:null, tracker:{day:START_DAY-1,lastNight:[],lastDate:null}, tr:{q:"",scope:"all",conf:"All",pos:"All",stat:"ppg",n:50}
+};
+function initTourney(){
+  const SEEDS=[1,16,8,9,5,12,4,13,6,11,3,14,7,10,2,15];
+  const field=[];REGIONS.forEach(r=>SEEDS.forEach(s=>field.push(teams.find(t=>t.region===r&&t.seed===s).id)));
+  S.T={round:0,day:0,field,next:[],results:[],done:false,champ:null};
+}
+initTourney();
+
+/* draft engine */
+function sequence(){
+  const d=S.draft,seq=[];
+  for(let r=1;r<=d.settings.rounds;r++){
+    let ord;
+    if(r<=d.settings.snake) ord=r%2?d.order:d.order.slice().reverse();
+    else ord=d.randOrders[r]||(d.randOrders[r]=shuffle(d.order));
+    ord.forEach(m=>seq.push({round:r,member:m,random:r>d.settings.snake}));
+  }
+  return seq;
+}
+function rosterOf(m){
+  let ids=S.draft.picks.filter(p=>p.member===m).map(p=>p.player);
+  S.swaps.filter(s=>s.member===m).forEach(s=>{ids=ids.map(x=>x===s.out?s.in:x)});
+  return ids;
+}
+function ownerMap(){const o={};MEMBERS.forEach(m=>rosterOf(m.id).forEach(id=>o[id]=m.id));return o}
+function pickInfo(pid){return S.draft.picks.find(p=>p.player===pid)}
+function bestAvailable(){const o=ownerMap();return players.filter(p=>eligible(p)&&o[p.id]===undefined).sort((a,b)=>b.ppg-a.ppg)[0]}
+function onClock(){const s=sequence();return s[S.draft.picks.length]}
+function makePick(pid,auto){
+  const d=S.draft;if(d.status!=="live")return;
+  const c=onClock();if(!c)return;
+  const p=players[pid];
+  const by=auto?"auto":S.role==="commish"?"commish":"self";
+  d.picks.push({round:c.round,overall:d.picks.length+1,member:c.member,player:pid,by});
+  d.clockStart=Date.now();
+  toast(`${auto?"Auto-pick: ":""}${MEMBERS[c.member].name} takes ${p.name}`);
+  if(d.picks.length>=sequence().length){d.status="done";toast("Draft complete. Teams are locked in.")}
+  closeDrawer();render();
+}
+function canPickNow(){const c=onClock();return S.draft.status==="live"&&c&&(S.role==="commish"||c.member===S.me)}
+function seedDemoDraft(){
+  const d=S.draft;d.order=shuffle(MEMBERS.map(m=>m.id),mulberry32(7));d.randOrders={};d.picks=[];d.reveal=MEMBERS.length;
+  const seq=sequence();
+  for(let i=0;i<6;i++){const b=bestAvailable();d.picks.push({round:seq[i].round,overall:i+1,member:seq[i].member,player:b.id})}
+  d.clockStart=Date.now();
+}
+seedDemoDraft();
+S.tracker.lastDate=dstr(START_DAY-1);
+S.tracker.lastNight=players.filter(p=>team(p).recent[4].day===START_DAY-1).map(p=>({id:p.id,pts:p.log[4]})).sort((a,b)=>b.pts-a.pts).slice(0,6);
+// start Troy with a small watchlist
+players.filter(eligible).sort((a,b)=>b.ppg-a.ppg).slice(9,12).forEach(p=>S.watch.add(p.id));
+
+/* tournament sim */
+const ROUNDS=["Round of 64","Round of 32","Sweet 16","Elite Eight","Final Four","Championship"];
+const DAYS=[["Thu","Fri"],["Sat","Sun"],["Thu","Fri"],["Sat","Sun"],["Sat"],["Mon"]];
+function nextLabel(){const T=S.T;return `${ROUNDS[T.round]} · ${DAYS[T.round][T.day]}`}
+function simDay(){
+  const T=S.T;if(T.done)return;
+  const games=T.field.length/2,days=DAYS[T.round].length,per=Math.ceil(games/days);
+  const from=T.day*per,to=Math.min(games,from+per);
+  for(let g=from;g<to;g++){
+    const a=teams[T.field[2*g]],b=teams[T.field[2*g+1]];
+    const pA=1/(1+Math.exp(-(b.seed-a.seed)*0.17));
+    const w=Math.random()<pA?a:b,l=w===a?b:a;
+    const score=t=>{let s=0;players.filter(p=>p.team===t.id).forEach(p=>{const pts=Math.max(0,Math.round(p.ppg+gauss(Math.random)*6));p.tPts+=pts;p.tGp++;p.tLog.push({round:ROUNDS[T.round],opp:(t===a?b:a).name,pts});s+=pts});return s+32+Math.floor(Math.random()*20)};
+    let sw=score(w),sl=score(l);if(sl>=sw)sl=sw-1-Math.floor(Math.random()*9);
+    l.alive=false;T.next[g]=w.id;
+    T.results.unshift({label:nextLabel(),w:w.id,l:l.id,sw,sl});
+  }
+  const label=nextLabel();
+  if(T.day<days-1)T.day++;
+  else{T.field=T.next;T.next=[];T.round++;T.day=0;if(T.field.length===1){T.done=true;T.champ=T.field[0]}}
+  toast(`${label} results are in`);render();
+}
+
+/* ---------- views ---------- */
+const TABS=[["leagues","Leagues"],["board","Big Board"],["draft","Draft Room"],["standings","Standings"],["tracker","Season Tracker"],["about","About"]];
+/* About */
+const EX=[
+  {name:"Jake",note:"Deep run, modest scorers",ps:[["Owen Carver",108,6],["Reed Holloway",52,4],["Cam Bishop",45,3],["Nate Pruitt",22,2],["Silas Grady",9,1]]},
+  {name:"Matt",note:"Big scorers, early exits",ps:[["Dante Okafor",31,1],["Ayo Mensah",24,1],["Micah Langford",38,2],["Colby Sutton",17,1],["Andre Quinn",30,2]]},
+  {name:"Ryan",note:"A bit of both",ps:[["Malik Ruiz",66,3],["Trey Navarro",51,3],["Quentin Bell",34,2],["Luka Tate",12,1],["Darius Vance",64,4]]},
+].map(t=>({...t,pts:t.ps.reduce((s,p)=>s+p[1],0),gp:t.ps.reduce((s,p)=>s+p[2],0)})).map(t=>({...t,avg:t.pts/t.gp})).sort((a,b)=>b.avg-a.avg);
+function vAbout(){
+  const d=S.draft.settings;
+  return `<div class="head"><div class="grow"><h2>About The Tournament Draft</h2><p>A player draft for the men's college basketball tournament. Instead of picking a bracket, you draft five players and root for them to score.</p></div></div>
+  <div class="grid2">
+    <div class="stack">
+      <div class="panel pad stack">
+        <h3>How it works</h3>
+        <ol class="steps">
+          <li><b>Join a league.</b> A commissioner creates the league and invites everyone by email.</li>
+          <li><b>The draft order is random.</b> When the commissioner starts the draft, the app draws the order. Nobody picks it, the commissioner included.</li>
+          <li><b>Draft five players from your phone.</b> If someone loses signal, the commissioner can enter their pick. Most rounds snake (1 to last, then back). The commissioner can set the last rounds to get a fresh random order instead. Use the Big Board to see who's scoring.</li>
+          <li><b>Follow the tournament.</b> Standings update after every game. Highest scoring average when the title game ends wins.</li>
+        </ol>
+      </div>
+      <div class="panel pad stack">
+        <h3>Scoring</h3>
+        <div class="formula"><span>Your score</span><span class="eq">=</span><span class="frac"><span>total points by your 5 players</span><span>total games your 5 players played</span></span></div>
+        <p style="margin:0">Only tournament games count, starting with the Round of 64. A player whose team gets knocked out keeps the points and games he already has. He just stops adding to them.</p>
+        <p style="margin:0">Total points don't win on their own. A team that goes deep plays more games, so its players need to keep scoring every night to keep the average up.</p>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="panel pad">
+        <h3>Example final standings</h3>
+        <p class="muted" style="margin:6px 0 10px;font-size:13.5px">Three sample teams at the end of a tournament.</p>
+        ${EX.map((t,i)=>`<div class="ex">
+          <div class="row" style="justify-content:space-between"><div><span class="rank" style="font-size:22px">${i+1}</span> <span class="pname">${t.name}</span> <span class="muted" style="font-size:13px">· ${t.note}</span></div><span class="avg">${f2(t.avg)}</span></div>
+          <div class="tw"><table class="extab"><thead><tr><th>Player</th><th class="r">Pts</th><th class="r">Games</th></tr></thead><tbody>
+          ${t.ps.map(p=>`<tr><td>${p[0]}</td><td class="r num">${p[1]}</td><td class="r num">${p[2]}</td></tr>`).join("")}
+          <tr class="tot"><td>Team</td><td class="r num">${t.pts}</td><td class="r num">${t.gp}</td></tr></tbody></table></div>
+          <div class="calc num">${t.pts} ÷ ${t.gp} = <b>${f2(t.avg)}</b></div></div>`).join("")}
+        <div class="note">Jake scored the most total points (${EX.find(t=>t.name==="Jake").pts}) but finishes last, because his players needed ${EX.find(t=>t.name==="Jake").gp} games to get there. Matt wins with fewer points in far fewer games.</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel pad stack" style="margin-top:18px">
+    <h3>The fine print</h3>
+    <dl class="rules">
+      <dt>First Four</dt><dd>Teams that play in the First Four are left off the board entirely, even if they win and reach the Round of 64.</dd>
+      <dt>Not an average of averages</dt><dd>Add up every point, then divide by every game. In the example, averaging Ryan's five player averages would give 16.80. His real score is 17.46, because his best scorers played more games and count for more.</dd>
+      <dt>Ties</dt><dd>If two or more teams finish with the same average, they're co-champions.</dd>
+      <dt>Injury swaps</dt><dd>If a player gets hurt before his first game, the commissioner can replace him with an undrafted player whose team hasn't played yet. The replaced player no longer counts for that team at all.</dd>
+      <dt>Pick clock</dt><dd>${d.timer?`Each pick has a ${d.timer}-second clock.`:"The pick clock is off in this league."} By default it just turns red and counts into negatives. Leagues can switch on auto-pick, which takes the best available player when time runs out.</dd>
+    </dl>
+  </div>`;
+}
+
+function renderTabs(){
+  $("#tabs").innerHTML=TABS.map(([k,l])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}">${l}${k==="draft"&&S.draft.status==="live"?'<span class="badge-live" aria-label="live"></span>':""}</button>`).join("");
+  $("#leagueName").textContent=S.league.name;
+  const nav=$("#tabs"),on=nav.querySelector('[aria-selected="true"]');if(on&&nav.scrollWidth>nav.clientWidth)nav.scrollLeft=on.offsetLeft-(nav.clientWidth-on.offsetWidth)/2;
+}
+function sampleNote(){return `<div class="sample"><b>Prototype</b> Players and stats are invented sample data. Real players and nightly stats get wired in when we build the app.</div>`}
+function render(){
+  renderTabs();
+  const v=$("#view");
+  v.innerHTML=sampleNote()+({leagues:vLeagues,board:vBoard,draft:vDraft,standings:vStandings,tracker:vTracker,about:vAbout}[S.tab])();
+  if(S.tab==="board")fillBoard();
+  if(S.tab==="draft")fillAvail();
+  if(S.tab==="tracker")fillTracker();
+  tick();
+}
+
+/* Leagues */
+function vLeagues(){
+  if(S.signinPreview) return `<div class="signin panel pad">
+    <div class="label">Sign in</div><h2>The Tournament Draft</h2>
+    ${S.signinSent?`<p>Check your email. We sent a sign-in link to <b>troy@example.com</b>. It works once and expires in 15 minutes.</p>
+      <div class="row"><button class="btn" data-act="signinBack">Back to the app</button></div>`:
+    `<p class="muted">No passwords. Enter your email and we'll send a one-tap sign-in link. If someone invited you, your league will be waiting.</p>
+    <form id="signinForm" class="stack"><div class="field"><label class="label" for="siEmail">Email</label><input id="siEmail" type="email" value="troy@example.com" required></div>
+    <button class="btn primary" type="submit">Email me a sign-in link</button></form>
+    <p class="muted" style="font-size:13px">Also offered: Continue with Google / Apple.</p>`}
+  </div>`;
+  const d=S.draft;
+  return `<div class="head"><div class="grow"><h2>Your leagues</h2><p>Each league is one draft for one tournament. A commissioner creates it, invites people by email, and runs the draft.</p></div>
+    <button class="btn" data-act="signinPreview">Preview sign-in screen</button></div>
+  <div class="grid2">
+    <div class="stack">
+      <div class="panel pad">
+        <div class="row" style="justify-content:space-between"><div><div class="label">Active league</div><h3 style="font-size:26px">${esc(S.league.name)}</h3></div><span class="chip acc">Draft ${d.status==="done"?"complete":d.status==="live"?"live now":"not started"}</span></div>
+        <p class="muted" style="margin:6px 0 12px">Run by ${esc(S.league.commish)} · ${MEMBERS.length} managers · ${d.settings.rounds} players each · Snake for ${d.settings.snake} round${d.settings.snake===1?"":"s"}${d.settings.snake<d.settings.rounds?`, random order for the last ${d.settings.rounds-d.settings.snake}`:""} · ${d.settings.timer?d.settings.timer+"s pick clock"+(d.settings.hard?" with auto-pick":" (soft)"):"No pick clock"}</p>
+        <div class="note">Scoring: total points ÷ total games played across your 5 players, tournament games only. First Four teams are left off the board.</div>
+        <div class="tw"><table><thead><tr><th>Manager</th><th class="hm">Email</th><th>Status</th></tr></thead><tbody>
+        ${MEMBERS.map(m=>`<tr><td class="pname">${esc(m.name)}${m.id===S.me?' <span class="chip">you</span>':""}</td><td class="muted hm">${esc(m.email)}</td><td><span class="chip good">Joined</span></td></tr>`).join("")}
+        ${S.league.invited.map(e=>`<tr><td class="muted" style="white-space:normal;word-break:break-all">${esc(e)}</td><td class="muted hm">—</td><td><span class="chip">Invite sent</span></td></tr>`).join("")}
+        </tbody></table></div>
+        ${S.role==="commish"?`<form id="inviteForm" class="row" style="margin-top:14px"><label class="label" for="invEmails" style="width:100%">Invite people</label>
+          <input class="inp" id="invEmails" placeholder="friend@email.com, another@email.com" style="flex:1 1 240px"><button class="btn primary" type="submit">Send invites</button></form>`
+          :`<p class="muted" style="margin-top:12px;font-size:13px">Only the commissioner can invite people. Switch “Viewing as” to Commissioner to try it.</p>`}
+      </div>
+    </div>
+    <div class="stack">
+      <div class="panel pad"><div class="label" style="margin-bottom:8px">My leagues</div>
+        ${S.leagues.map(l=>`<div class="res"><span class="w">${esc(l.name)}</span><span class="chip">${esc(l.role)} · ${l.size}</span></div>`).join("")}
+      </div>
+      <form class="panel pad stack" id="createForm">
+        <h3>Create a league</h3>
+        <div class="field"><label class="label" for="cName">League name</label><input id="cName" value="Family Bracket Draft 2027"></div>
+        <div class="row">
+          <div class="field" style="flex:1"><label class="label" for="cRounds">Players per team</label><input id="cRounds" type="number" min="3" max="8" value="5"></div>
+          <div class="field" style="flex:1"><label class="label" for="cSnake">Snake rounds</label><input id="cSnake" type="number" min="0" max="8" value="4"></div>
+        </div>
+        <div class="field"><label class="label" for="cTimer">Pick clock</label><select id="cTimer"><option value="60">60 seconds, soft (goes negative)</option><option value="60h">60 seconds, auto-pick when it hits 0</option><option value="0">No clock</option></select></div>
+        <button class="btn primary" type="submit">Create and get invite link</button>
+      </form>
+    </div>
+  </div>`;
+}
+
+/* Big board */
+function vBoard(){
+  const b=S.board;
+  return `<div class="head"><div class="grow"><h2>Big Board</h2><p>Every player in the field ranked by points per game. Tap a player for the full breakdown. Star players to add them to your watchlist.</p></div>
+    <div class="row"><span class="chip"><span class="inj" style="margin:0">*</span> Injured, tap for details</span><span class="chip">${teams.filter(t=>t.ff).length} First Four teams excluded</span></div></div>
+  <div class="panel">
+    <div class="filters">
+      <input class="inp" id="bq" type="search" placeholder="Search player or school" value="${esc(b.q)}" aria-label="Search">
+      <div class="seg" role="group" aria-label="Position">${["All","G","F","C"].map(p=>`<button data-pos="${p}" aria-pressed="${b.pos===p}">${p==="All"?"All":p}</button>`).join("")}</div>
+      <select class="inp sortsel" id="bsort" aria-label="Sort by">${[["ppg","Sort: PPG"],["rpg","Sort: RPG"],["apg","Sort: APG"],["fg","Sort: FG%"],["tp","Sort: 3P%"],["ft","Sort: FT%"],["gp","Sort: GP"]].map(([k,l])=>`<option value="${k}" ${S.board.sort===k?"selected":""}>${l}</option>`).join("")}</select>
+      <div class="seg" role="group" aria-label="Availability">${["All","Available","Watchlist"].map(p=>`<button data-avail="${p}" aria-pressed="${(b.avail||"All")===p}">${p}</button>`).join("")}</div>
+    </div>
+    <div class="tw"><table><thead><tr>
+      <th></th><th>#</th><th>Player</th><th class="hm">Pos</th><th class="hm">School</th>
+      ${[["ppg","PPG"],["rpg","RPG"],["apg","APG"],["fg","FG%"],["tp","3P%"],["ft","FT%"],["gp","GP"]].map(([k,l])=>`<th class="sort r ${b.sort===k?"on":""}${k==="ppg"||k===b.sort?"":" hm"}" data-sort="${k}">${l}${b.sort===k?(b.dir<0?" ↓":" ↑"):""}</th>`).join("")}
+      <th class="hm">Draft status</th></tr></thead><tbody id="boardBody"></tbody></table></div>
+  </div>`;
+}
+function boardRows(){
+  const b=S.board,o=ownerMap(),q=b.q.trim().toLowerCase();
+  const ranked=players.filter(eligible).sort((x,y)=>y.ppg-x.ppg);ranked.forEach((p,i)=>p.rank=i+1);
+  return ranked.filter(p=>(b.pos==="All"||p.pos===b.pos)&&(!q||p.name.toLowerCase().includes(q)||team(p).name.toLowerCase().includes(q))
+    &&((b.avail||"All")==="All"||(b.avail==="Available"&&o[p.id]===undefined)||(b.avail==="Watchlist"&&S.watch.has(p.id))))
+    .sort((x,y)=>(x[b.sort]-y[b.sort])*b.dir);
+}
+function fillBoard(){
+  const o=ownerMap(),rows=boardRows();
+  $("#boardBody").innerHTML=rows.length?rows.map(p=>{const t=team(p),own=o[p.id];return `<tr class="click ${own!==undefined?"taken":""}" data-player="${p.id}">
+    <td><button class="star ${S.watch.has(p.id)?"on":""}" data-star="${p.id}" aria-label="Watch ${esc(p.name)}">★</button></td>
+    <td class="rank">${p.rank}</td><td class="pname">${esc(p.name)}${injMark(p)}<div class="sub">${p.pos} · ${esc(t.name)} ${t.seed}${own!==undefined?" · "+esc(MEMBERS[own].name):""}</div></td><td class="hm">${p.pos}</td>
+    <td class="hm">${esc(t.name)} <span class="seed">${t.seed} ${t.region[0]}</span></td>
+    <td class="r num"><b>${f1(p.ppg)}</b></td><td class="r num${S.board.sort==="rpg"?"":" hm"}">${f1(p.rpg)}</td><td class="r num${S.board.sort==="apg"?"":" hm"}">${f1(p.apg)}</td><td class="r num${S.board.sort==="fg"?"":" hm"}">${f1(p.fg)}</td><td class="r num${S.board.sort==="tp"?"":" hm"}">${f1(p.tp)}</td><td class="r num${S.board.sort==="ft"?"":" hm"}">${f1(p.ft)}</td><td class="r num${S.board.sort==="gp"?"":" hm"}">${p.gp}</td>
+    <td class="hm">${own!==undefined?`<span class="chip">${esc(MEMBERS[own].name)}</span>`:`<span class="chip good">Available</span>`}</td></tr>`}).join("")
+    :`<tr><td colspan="13" class="empty">No players match. Clear the search or filters.</td></tr>`;
+}
+
+/* Draft room */
+function vDraft(){
+  const d=S.draft,commish=S.role==="commish";
+  if(d.status==="setup"||d.status==="drawing") return vDraftSetup();
+  const c=onClock(),seq=sequence(),idx=d.picks.length;
+  const clock=d.status==="live"?`<div class="clock">
+      <div><div class="label" style="color:inherit;opacity:.7">On the clock · Round ${c.round}, pick ${idx+1} of ${seq.length}${c.random?" · random-order round":""}</div>
+      <div class="who">${esc(MEMBERS[c.member].name)}${c.member===S.me?" (you)":""}</div>
+      <div class="meta">${commish?`${esc(MEMBERS[c.member].name)} is picking on their phone. No signal? Enter the pick for them below.`:c.member===S.me?"You're up. Pick from the list below.":`Waiting for ${esc(MEMBERS[c.member].name)} to pick.`}</div>
+      <div class="upnext">${seq.slice(idx+1,idx+7).map((s,i)=>`<span>${idx+2+i}. ${esc(MEMBERS[s.member].name)}${s.round!==c.round?` · R${s.round}`:""}</span>`).join("")}</div></div>
+      <div class="timer num" id="clock" aria-live="off"></div></div>`
+    :`<div class="clock"><div><div class="label" style="color:inherit;opacity:.7">Draft complete</div><div class="who">Teams are locked</div><div class="meta">${seq.length} picks made. Head to Standings to follow the tournament.</div></div></div>`;
+  return `<div class="head"><div class="grow"><h2>Draft Room</h2><p>${commish?"Everyone drafts from their own phone. If someone loses signal, you can enter their pick for them.":"Draft from your phone when you're on the clock. If your signal drops, the commissioner can enter your pick for you. Players leave the board for everyone as soon as they're taken."}</p></div>
+    ${commish?`<div class="row"><button class="btn" data-act="undo" ${d.picks.length?"":"disabled"}>Undo last pick</button>${d.status==="live"?`<button class="btn" data-act="autodraft">Finish with auto-picks (demo)</button>`:""}<button class="btn" data-act="resetDraft">Reset draft</button></div>`:""}</div>
+  ${clock}
+  <div class="grid2">
+    <div class="panel">
+      <div class="filters"><input class="inp" id="aq" type="search" placeholder="Search available players" aria-label="Search available players">
+        <div class="seg" role="group" aria-label="Position">${["All","G","F","C"].map(p=>`<button data-apos="${p}" aria-pressed="${(S.apos||"All")===p}">${p}</button>`).join("")}</div></div>
+      <div class="tw" style="max-height:560px;overflow-y:auto"><table><thead><tr><th>#</th><th>Player</th><th class="hm">School</th><th class="r">PPG</th><th></th></tr></thead><tbody id="availBody"></tbody></table></div>
+    </div>
+    <div class="stack">
+      <div class="label">Teams · ${d.settings.rounds} picks each</div>
+      <div class="rosters">${MEMBERS.slice().sort((a,b)=>d.order.indexOf(a.id)-d.order.indexOf(b.id)).map(m=>{
+        const ids=rosterOf(m.id);
+        return `<div class="roster ${c&&d.status==="live"&&c.member===m.id?"on":""}"><h4><span>${d.order.indexOf(m.id)+1}. ${esc(m.name)}</span><span class="num muted">${ids.length}/${d.settings.rounds}</span></h4>
+        ${Array.from({length:d.settings.rounds},(_,i)=>{const p=players[ids[i]];return p?`<div class="slot"><a href="#" data-player="${p.id}">${esc(p.name)}</a>${injMark(p)}${pickInfo(p.id)?.by==="auto"?'<span class="by" title="Auto-pick">A</span>':""}<span class="num muted" style="margin-left:auto">${f1(p.ppg)}</span></div>`:`<div class="slot"><span class="e">Round ${i+1}</span></div>`}).join("")}</div>`}).join("")}</div>
+    </div>
+  </div>`;
+}
+function vDraftSetup(){
+  const d=S.draft,s=d.settings,commish=S.role==="commish";
+  const drawn=d.order.slice(0,d.reveal);
+  return `<div class="head"><div class="grow"><h2>Draft setup</h2><p>The commissioner sets the rules and starts the draft. The draft order is drawn at random the moment the draft starts, so nobody picks it, the commissioner included.</p></div></div>
+  <div class="grid2">
+    <div class="panel pad stack">
+      <h3>Draft order</h3>
+      <div class="order">${MEMBERS.map((m,i)=>{const id=drawn[i];return id!==undefined?`<div class="pop"><b>${i+1}</b>${esc(MEMBERS[id].name)}</div>`:`<div class="pending"><b>${i+1}</b>?</div>`}).join("")}</div>
+      ${d.status==="drawing"?`<p class="muted" style="margin:0">Drawing the order…</p>`:commish?`<div class="row"><button class="btn primary" data-act="startDraft">Start the draft</button><span class="muted" style="font-size:13px">Everyone in the league sees the order revealed live.</span></div>`:`<p class="muted" style="margin:0">Waiting for the commissioner to start the draft.</p>`}
+    </div>
+    <form class="panel pad stack" id="settingsForm">
+      <h3>Rules</h3>
+      <div class="row">
+        <div class="field" style="flex:1"><label class="label" for="sRounds">Players per team</label><input id="sRounds" type="number" min="1" max="8" value="${s.rounds}" ${commish?"":"disabled"}></div>
+        <div class="field" style="flex:1"><label class="label" for="sSnake">Snake rounds</label><input id="sSnake" type="number" min="0" max="${s.rounds}" value="${s.snake}" ${commish?"":"disabled"}></div>
+      </div>
+      <p class="muted" style="margin:0;font-size:13px">Rounds after the snake rounds get a fresh random order, drawn when that round starts.</p>
+      <div class="field"><label class="label" for="sTimer">Pick clock (seconds, 0 = off)</label><input id="sTimer" type="number" min="0" max="600" step="15" value="${s.timer}" ${commish?"":"disabled"}></div>
+      <label class="row" for="sHard" style="gap:8px"><input id="sHard" type="checkbox" ${s.hard?"checked":""} ${commish?"":"disabled"}> Auto-pick the best available player when the clock hits 0</label>
+      <p class="muted" style="margin:0;font-size:13px">Leave this off for a friendly draft: the clock turns red and counts into negatives, with no penalty.</p>
+    </form>
+  </div>`;
+}
+function fillAvail(){
+  const body=$("#availBody");if(!body)return;
+  const o=ownerMap(),q=($("#aq")?.value||"").toLowerCase(),pos=S.apos||"All",can=canPickNow();
+  const ranked=players.filter(eligible).sort((a,b)=>b.ppg-a.ppg);
+  const rows=ranked.map((p,i)=>({p,r:i+1})).filter(({p})=>o[p.id]===undefined&&(pos==="All"||p.pos===pos)&&(!q||p.name.toLowerCase().includes(q)||team(p).name.toLowerCase().includes(q)));
+  body.innerHTML=rows.slice(0,80).map(({p,r})=>`<tr class="click" data-player="${p.id}"><td class="rank">${r}</td><td><span class="pname">${esc(p.name)}</span>${injMark(p)} <span class="muted">${p.pos}</span>${S.watch.has(p.id)?' <span class="crown">★</span>':""}<div class="sub">${esc(team(p).name)} ${team(p).seed}</div></td>
+    <td class="hm">${esc(team(p).name)} <span class="seed">${team(p).seed}</span></td><td class="r num"><b>${f1(p.ppg)}</b></td>
+    <td class="r">${S.draft.status==="live"?`<button class="btn small ${can?"primary":""}" data-draft="${p.id}" ${can?"":"disabled"}>Draft</button>`:""}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">No available players match.</td></tr>`;
+}
+function tick(){
+  const el=$("#clock");if(!el)return;const d=S.draft;
+  if(d.status!=="live")return;
+  if(!d.settings.timer){el.className="timer num off";el.textContent="No clock";return}
+  const left=d.settings.timer-Math.floor((Date.now()-d.clockStart)/1000);
+  if(left<=0&&d.settings.hard){makePick(bestAvailable().id,true);return}
+  el.className="timer num"+(left<0?" over":"");
+  const a=Math.abs(left);el.textContent=(left<0?"-":"")+(a>=60?Math.floor(a/60)+":"+String(a%60).padStart(2,"0"):String(a));
+}
+setInterval(tick,1000);
+
+/* Standings */
+function vStandings(){
+  const d=S.draft,T=S.T,commish=S.role==="commish";
+  if(d.status!=="done") return `<div class="head"><div class="grow"><h2>Standings</h2><p>Standings open once the draft is finished.</p></div></div>
+    <div class="panel empty"><p>The draft is ${d.status==="live"?"still going":"not started"}. ${d.picks.length} of ${sequence().length} picks made.</p>
+    ${commish?`<button class="btn primary" data-act="autodraft">Finish the draft with auto-picks (demo)</button>`:""}</div>`;
+  const rows=MEMBERS.map(m=>{const ids=rosterOf(m.id),ps=ids.map(i=>players[i]);const pts=ps.reduce((s,p)=>s+p.tPts,0),gp=ps.reduce((s,p)=>s+p.tGp,0);
+    return {m,ps,pts,gp,avg:gp?pts/gp:null,alive:ps.filter(p=>team(p).alive).length}}).sort((a,b)=>(b.avg??-1)-(a.avg??-1)||b.pts-a.pts);
+  let rank=0;rows.forEach((r,i)=>{if(i===0||Math.abs((r.avg??-1)-(rows[i-1].avg??-1))>1e-9)rank=i+1;r.rank=rank});
+  const top=rows.filter(r=>r.rank===1&&r.avg!==null);
+  return `<div class="head"><div class="grow"><h2>Standings</h2><p>Average = total points ÷ total games across all 5 players. Eliminated players keep the points and games they already have. <a href="#" data-tab="about">See a scoring example</a></p></div>
+    ${commish&&!T.done?`<button class="btn primary" data-act="simDay">Play ${nextLabel()} (demo)</button>`:""}${commish?`<button class="btn" data-act="resetTourney">Reset tournament</button>`:""}</div>
+  ${T.done?`<div class="clock"><div><div class="label" style="color:inherit;opacity:.7">Final · ${esc(teams[T.champ].name)} won the title</div><div class="who">${top.length>1?"Co-champions: ":"Champion: "}${top.map(r=>esc(r.m.name)).join(" & ")}</div><div class="meta">${f2(top[0].avg)} points per game</div></div></div>`:""}
+  <div class="grid2">
+    <div class="panel tw"><table class="stand"><thead><tr><th>#</th><th>Manager</th><th class="r">Avg</th><th class="r hm">Pts</th><th class="r hm">GP</th><th>Players (pts/games)</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td class="rank">${r.rank}</td><td><span class="pname">${esc(r.m.name)}</span>${r.m.id===S.me?' <span class="chip">you</span>':""}${T.done&&r.rank===1?' <span class="crown">★</span>':""}<div class="muted" style="font-size:12px">${r.alive} of ${r.ps.length} alive</div></td>
+      <td class="r"><span class="avg">${r.avg===null?"—":f2(r.avg)}</span><div class="sub num">${r.pts} / ${r.gp}</div></td><td class="r num hm">${r.pts}</td><td class="r num hm">${r.gp}</td>
+      <td class="mini">${r.ps.map(p=>`<span class="${team(p).alive?"":"out"}"><a href="#" data-player="${p.id}">${esc(p.name[0]+". "+p.name.split(" ")[1])}</a>${injMark(p)} ${p.tPts}/${p.tGp}${commish&&p.tGp===0&&team(p).alive?` <button class="btn small" data-swap="${r.m.id}:${p.id}" title="Replace this player">Swap</button>`:""}</span>`).join("")}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="stack">
+      ${S.swapUI?swapPanel():""}
+      <div class="panel pad"><div class="label" style="margin-bottom:6px">Results</div>
+      ${T.results.length?`<div class="results">${T.results.slice(0,14).map(r=>`<div class="res"><span><span class="w">${esc(teams[r.w].name)} <span class="seed">${teams[r.w].seed}</span></span> over ${esc(teams[r.l].name)} <span class="seed">${teams[r.l].seed}</span></span><span class="num muted">${r.sw}-${r.sl}</span></div>`).join("")}</div>`
+        :`<p class="muted">No games yet. Results land here after every game.${commish?" Use the Play button to simulate a day.":""}</p>`}</div>
+      ${S.swaps.length?`<div class="panel pad"><div class="label" style="margin-bottom:6px">Commissioner changes</div>${S.swaps.map(s=>`<div class="res"><span>${esc(MEMBERS[s.member].name)}: ${esc(players[s.out].name)} → <b>${esc(players[s.in].name)}</b></span></div>`).join("")}</div>`:""}
+    </div>
+  </div>`;
+}
+function swapPanel(){
+  const {member,out}=S.swapUI,o=ownerMap();
+  const opts=players.filter(p=>eligible(p)&&o[p.id]===undefined&&p.tGp===0&&team(p).alive).sort((a,b)=>b.ppg-a.ppg).slice(0,12);
+  return `<div class="panel pad"><div class="row" style="justify-content:space-between"><h3>Replace ${esc(players[out].name)}</h3><button class="btn small" data-act="cancelSwap">Cancel</button></div>
+  <p class="muted" style="font-size:13px">For ${esc(MEMBERS[member].name)}. Only undrafted players whose team hasn't played yet are listed.</p>
+  ${opts.length?opts.map(p=>`<div class="res"><span>${esc(p.name)}${injMark(p)} <span class="muted">${p.pos} · ${esc(team(p).name)}</span></span><button class="btn small primary" data-doswap="${p.id}">${f1(p.ppg)} · Pick</button></div>`).join(""):`<p class="muted">No eligible players left. Every remaining team has already played.</p>`}</div>`;
+}
+
+/* Season tracker */
+const STATS=[["ppg","Points","PPG"],["rpg","Rebounds","RPG"],["apg","Assists","APG"],["fg","FG%","FG%"],["tp","3-point %","3P%"],["ft","Free throw %","FT%"]];
+function trRows(){const f=S.tr,q=f.q.trim().toLowerCase();
+  return players.filter(p=>{const t=team(p);return (f.scope!=="top25"||t.ap)&&(f.conf==="All"||t.conf===f.conf)&&(f.pos==="All"||p.pos===f.pos)&&(!q||p.name.toLowerCase().includes(q)||t.name.toLowerCase().includes(q))})
+    .sort((a,b)=>b[f.stat]-a[f.stat])}
+function trCols(){const f=S.tr;return ["ppg","rpg","apg",...(["ppg","rpg","apg"].includes(f.stat)?[]:[f.stat])]}
+function vTracker(){
+  const f=S.tr,confs=[...new Set(teams.map(t=>t.conf))].sort();
+  const w=[...S.watch].map(i=>players[i]),ln=S.tracker.lastNight;
+  const leaders=confs.map(c=>players.filter(p=>team(p).conf===c).sort((a,b)=>b.ppg-a.ppg)[0]).sort((a,b)=>b.ppg-a.ppg);
+  return `<div class="head"><div class="grow"><h2>Season Tracker</h2><p>Leaders across college basketball, updated after every game. Narrow it to the AP Top 25 or one conference, and star players to build your watchlist for draft night.</p></div>
+    <button class="btn primary" data-act="night">Simulate the next game night (demo)</button></div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="filters">
+        <input class="inp" id="tq" type="search" placeholder="Search player or school" value="${esc(f.q)}" aria-label="Search">
+        <div class="seg" role="group" aria-label="Teams">${[["all","All teams"],["top25","AP Top 25"]].map(([k,l])=>`<button data-scope="${k}" aria-pressed="${f.scope===k}">${l}</button>`).join("")}</div>
+        <select class="inp" id="tconf" aria-label="Conference" style="flex:0 1 auto"><option value="All">All conferences</option>${confs.map(c=>`<option ${f.conf===c?"selected":""}>${esc(c)}</option>`).join("")}</select>
+        <select class="inp" id="tstat" aria-label="Leaders in" style="flex:0 1 auto">${STATS.map(([k,l])=>`<option value="${k}" ${f.stat===k?"selected":""}>Leaders: ${l}</option>`).join("")}</select>
+        <div class="seg" role="group" aria-label="Position">${["All","G","F","C"].map(x=>`<button data-tpos="${x}" aria-pressed="${f.pos===x}">${x}</button>`).join("")}</div>
+      </div>
+      <div class="trsum muted" id="trSum"></div>
+      <div class="tw"><table><thead><tr><th></th><th>#</th><th>Player</th><th class="hm">School</th>
+        ${trCols().map(k=>`<th class="r ${k===f.stat?"on":"hm"}">${STATS.find(x=>x[0]===k)[2]}</th>`).join("")}
+        <th class="hm">Last 5</th><th class="r hm">GP</th></tr></thead><tbody id="trBody"></tbody></table></div>
+      <div id="trMore" class="row" style="justify-content:center;padding:12px"></div>
+    </div>
+    <div class="stack">
+      <div class="panel pad"><div class="label" style="margin-bottom:6px">My watchlist · ${w.length}</div>
+        ${w.length?w.map(p=>`<div class="res"><span><a href="#" data-player="${p.id}" class="pname">${esc(p.name)}</a>${injMark(p)} <span class="muted">${esc(team(p).name)}</span></span><span class="num">${f1(p.ppg)}</span></div>`).join(""):`<p class="muted">Star any player to follow them here.</p>`}</div>
+      <div class="panel pad"><div class="label" style="margin-bottom:6px">Top scorers · ${S.tracker.lastDate||"last game night"}</div>
+        ${ln.length?ln.map(x=>`<div class="res"><span><a href="#" data-player="${x.id}">${esc(players[x.id].name)}</a> <span class="muted">${apTag(team(players[x.id]))}${esc(team(players[x.id]).name)}</span></span><span class="num"><b>${x.pts}</b> pts</span></div>`).join(""):`<p class="muted">Run a game night to see who went off.</p>`}</div>
+      <div class="panel pad"><div class="label" style="margin-bottom:6px">Leading scorer by conference</div>
+        ${leaders.map(p=>`<div class="res"><span><a href="#" data-conf="${esc(team(p).conf)}" class="pname">${esc(team(p).conf)}</a> <span class="muted">· <a href="#" data-player="${p.id}">${esc(p.name)}</a>, ${esc(team(p).name)}</span></span><span class="num">${f1(p.ppg)}</span></div>`).join("")}</div>
+    </div>
+  </div>`;
+}
+function fillTracker(){
+  const body=$("#trBody");if(!body)return;const f=S.tr,rows=trRows(),cols=trCols();
+  body.innerHTML=rows.slice(0,f.n).map((p,i)=>{const t=team(p);return `<tr class="click" data-player="${p.id}"><td><button class="star ${S.watch.has(p.id)?"on":""}" data-star="${p.id}" aria-label="Watch ${esc(p.name)}">★</button></td><td class="rank">${i+1}</td>
+    <td class="pname">${esc(p.name)}${injMark(p)} <span class="muted">${p.pos}</span><div class="sub">${apTag(t)}${esc(t.name)} · ${esc(t.conf)}</div></td>
+    <td class="hm">${apTag(t)}${esc(t.name)} <span class="seed">${esc(t.conf)}</span></td>
+    ${cols.map(k=>`<td class="r num ${k===f.stat?"":"hm"}">${k===f.stat?`<b>${f1(p[k])}</b>`:f1(p[k])}</td>`).join("")}
+    <td class="hm">${spark(p)}</td><td class="r num hm">${p.gp}</td></tr>`}).join("")||`<tr><td colspan="9" class="empty">No players match. Try a different conference or clear the search.</td></tr>`;
+  $("#trSum").textContent=`${rows.length} players${f.scope==="top25"?" on AP Top 25 teams":""}${f.conf!=="All"?" in the "+f.conf:""}`;
+  $("#trMore").innerHTML=rows.length>f.n?`<button class="btn" data-act="trMore">Show ${Math.min(50,rows.length-f.n)} more</button>`:"";
+}
+function spark(p){const max=Math.max(...p.log,30);return `<svg width="70" height="20" viewBox="0 0 70 20" aria-label="Last five games: ${p.log.join(", ")} points" class="chart">${p.log.map((v,i)=>`<rect class="bar" x="${i*14+1}" y="${20-v/max*20}" width="10" height="${v/max*20}" rx="1.5"/>`).join("")}</svg>`}
+function gameNight(){
+  const day=++S.tracker.day,out=[];let games=0;
+  teams.forEach(t=>{
+    if(!t.upcoming.length||t.upcoming[0].day>day)return;
+    const g=t.upcoming.shift(),o=teams[g.opp];games++;
+    t.recent=[...t.recent.slice(1),{day,opp:o.id,home:g.home,...result(t,o,Math.random)}];
+    t.upcoming.push({day:(t.upcoming.length?t.upcoming[t.upcoming.length-1].day:day)+2+Math.floor(Math.random()*3),opp:pickOpp(t,Math.random).id,home:Math.random()<.5});
+    players.filter(p=>p.team===t.id).forEach(p=>{
+      const pts=Math.max(0,Math.round(p.ppg+gauss(Math.random)*6)),reb=Math.max(0,Math.round(p.rpg+gauss(Math.random)*2.5)),ast=Math.max(0,Math.round(p.apg+gauss(Math.random)*1.8));
+      p.ppg=(p.ppg*p.gp+pts)/(p.gp+1);p.rpg=(p.rpg*p.gp+reb)/(p.gp+1);p.apg=(p.apg*p.gp+ast)/(p.gp+1);p.gp++;
+      p.log=[...p.log.slice(1),pts];p.glog=[...p.glog.slice(1),{pts,reb,ast}];out.push({id:p.id,pts});
+    });
+  });
+  S.tracker.lastNight=out.sort((a,b)=>b.pts-a.pts).slice(0,6);S.tracker.lastDate=dstr(day);
+  toast(`Stats updated for ${dstr(day)}: ${games} teams played`);render();
+}
+/* Player drawer */
+function openPlayer(id){
+  const p=players[id],t=team(p),o=ownerMap(),own=o[id],pi=pickInfo(id),c=onClock();
+  const max=Math.max(...p.log,Math.ceil(p.ppg)+5,30),W=320,H=120,bw=36,gap=(W-40-5*bw)/4;
+  const y=v=>H-20-(v/max)*(H-34);
+  const chart=`<svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Points in last five games">
+    <line class="grid" x1="30" x2="${W}" y1="${H-20}" y2="${H-20}"/>
+    <line class="ref" x1="30" x2="${W}" y1="${y(p.ppg)}" y2="${y(p.ppg)}"/><text x="0" y="${y(p.ppg)+3}">${f1(p.ppg)}</text>
+    ${p.log.map((v,i)=>{const x=40+i*(bw+gap);return `<rect class="bar" x="${x}" y="${y(v)}" width="${bw}" height="${H-20-y(v)}" rx="3"/><text class="lab" x="${x+bw/2}" y="${y(v)-4}" text-anchor="middle">${v}</text><text x="${x+bw/2}" y="${H-6}" text-anchor="middle">${dstr(t.recent[i].day)}</text>`}).join("")}
+  </svg>`;
+  const canDraft=S.draft.status==="live"&&own===undefined&&eligible(p)&&canPickNow();
+  $("#drawerHost").innerHTML=`<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${esc(p.name)}">
+    <button class="btn small x" data-act="close">Close</button>
+    <div class="label">${t.ap?`AP #${t.ap} · `:""}${esc(t.name)} · ${esc(t.conf)} · ${t.seed} seed, ${t.region}</div>
+    <h2 style="margin-top:4px">${esc(p.name)}${injMark(p)}</h2>
+    ${p.inj?`<div class="injbox"><b>${p.inj.status}</b> · ${esc(p.inj.note)}<div class="muted" style="font-size:12.5px">Updated ${p.inj.updated}. Check the latest news before drafting.</div></div>`:""}
+    <div class="row" style="margin-top:8px">
+      <span class="chip">${{G:"Guard",F:"Forward",C:"Center"}[p.pos]}</span><span class="chip">${p.ht}</span><span class="chip">${p.cls}</span>
+      ${t.ff?'<span class="chip bad">First Four team · not draftable</span>':own!==undefined?`<span class="chip acc">${esc(MEMBERS[own].name)}${pi?` · R${pi.round}, pick ${pi.overall}`:" · commissioner swap"}</span>`:'<span class="chip good">Available</span>'}
+    </div>
+    <div class="tiles">
+      ${[["PPG",f1(p.ppg)],["RPG",f1(p.rpg)],["APG",f1(p.apg)],["MPG",f1(p.mpg)],["FG%",f1(p.fg)],["3P%",f1(p.tp)],["FT%",f1(p.ft)],["GP",p.gp]].map(([k,v])=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("")}
+    </div>
+    <div class="row">
+      <button class="btn ${S.watch.has(id)?"":"primary"}" data-star="${id}">${S.watch.has(id)?"Remove from watchlist":"Add to watchlist"}</button>
+      ${S.role==="commish"?`<button class="btn" data-act="toggleInj" data-id="${id}">${p.inj?"Clear injury":"Mark injured"}</button>`:""}
+      ${canDraft?`<button class="btn primary" data-draft="${id}">Draft for ${esc(MEMBERS[c.member].name)}</button>`:""}
+    </div>
+    <div class="sec"><h3>Last 5 games</h3><p class="muted" style="margin:0 0 6px;font-size:13px">Points per game. Dashed line is the season average.</p>${chart}
+      <div class="tw" style="margin-top:8px"><table class="extab"><thead><tr><th>Date</th><th>Opponent</th><th>Result</th><th class="r">PTS</th><th class="r">REB</th><th class="r">AST</th></tr></thead><tbody>
+      ${t.recent.map((g,i)=>({g,s:p.glog[i]})).reverse().map(({g,s})=>`<tr><td class="muted">${dstr(g.day)}</td><td>${g.home?"vs":"@"} ${apTag(teams[g.opp])}${esc(teams[g.opp].name)}</td><td><span class="wl ${g.w?"w":"l"}">${g.w?"W":"L"}</span> <span class="num">${g.us}-${g.them}</span></td><td class="r num"><b>${s.pts}</b></td><td class="r num">${s.reb}</td><td class="r num">${s.ast}</td></tr>`).join("")}
+      </tbody></table></div></div>
+    <div class="sec"><h3>Upcoming</h3>${t.upcoming.map(g=>`<div class="res"><span><span class="muted">${dstr(g.day)}</span> · ${g.home?"vs":"@"} ${apTag(teams[g.opp])}${esc(teams[g.opp].name)}</span><span class="muted">${teams[g.opp].conf===t.conf?"Conference":"Non-conference"}</span></div>`).join("")}</div>
+    <div class="sec"><h3>Tournament</h3>${p.tGp?`<p style="margin:0 0 6px"><b class="num">${p.tPts}</b> pts in <b class="num">${p.tGp}</b> games · <b class="num">${f1(p.tPts/p.tGp)}</b> per game</p>
+      ${p.tLog.map(g=>`<div class="res"><span>${g.round} vs ${esc(g.opp)}</span><span class="num">${g.pts} pts</span></div>`).join("")}`:`<p class="muted" style="margin:0">${t.ff?"Excluded: First Four games and teams don't count.":"No tournament games yet."}</p>`}</div>
+  </aside>`;
+}
+function closeDrawer(){$("#drawerHost").innerHTML=""}
+
+/* ---------- events ---------- */
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-tab],[data-act],[data-player],[data-star],[data-draft],[data-pos],[data-avail],[data-sort],[data-apos],[data-swap],[data-doswap],[data-scope],[data-tpos],[data-conf]");
+  if(!el)return;
+  const ds=el.dataset;
+  if(ds.star!==undefined){e.stopPropagation();const id=+ds.star;S.watch.has(id)?S.watch.delete(id):S.watch.add(id);toast(S.watch.has(id)?`${players[id].name} added to watchlist`:`Removed from watchlist`);
+    if($(".drawer"))openPlayer(id);if(S.tab==="board")fillBoard();else if(S.tab==="draft")fillAvail();else render();return}
+  if(ds.draft!==undefined){e.stopPropagation();makePick(+ds.draft);return}
+  if(ds.tab){e.preventDefault();S.tab=ds.tab;S.signinPreview=false;closeDrawer();render();window.scrollTo(0,0);return}
+  if(ds.player!==undefined){e.preventDefault();openPlayer(+ds.player);return}
+  if(ds.pos){S.board.pos=ds.pos;render();return}
+  if(ds.avail){S.board.avail=ds.avail;render();return}
+  if(ds.apos){S.apos=ds.apos;document.querySelectorAll("[data-apos]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.apos===ds.apos));fillAvail();return}
+  if(ds.sort){const b=S.board;b.dir=b.sort===ds.sort?-b.dir:-1;b.sort=ds.sort;render();return}
+  if(ds.scope){S.tr.scope=ds.scope;S.tr.n=50;render();return}
+  if(ds.tpos){S.tr.pos=ds.tpos;S.tr.n=50;render();return}
+  if(ds.conf){e.preventDefault();S.tr.conf=ds.conf;S.tr.scope="all";S.tr.n=50;render();window.scrollTo(0,0);return}
+  if(ds.swap){const [m,p]=ds.swap.split(":").map(Number);S.swapUI={member:m,out:p};render();return}
+  if(ds.doswap){const {member,out}=S.swapUI;S.swaps.push({member,out,in:+ds.doswap});toast(`${players[out].name} replaced by ${players[+ds.doswap].name}`);S.swapUI=null;render();return}
+  const a=ds.act,d=S.draft;
+  if(a==="close")closeDrawer();
+  if(a==="signinPreview"){S.signinPreview=true;S.signinSent=false;render()}
+  if(a==="signinBack"){S.signinPreview=false;render()}
+  if(a==="undo"&&d.picks.length){const p=d.picks.pop();d.status="live";d.clockStart=Date.now();toast(`Undid ${players[p.player].name}`);render()}
+  if(a==="autodraft"){if(d.status==="setup"||d.status==="drawing"){if(!d.order.length||d.status==="drawing")d.order=shuffle(MEMBERS.map(m=>m.id));d.reveal=MEMBERS.length;d.status="live"}while(d.status==="live"){const c=onClock(),b=bestAvailable();const pool=players.filter(p=>eligible(p)&&ownerMap()[p.id]===undefined).sort((x,y)=>y.ppg-x.ppg).slice(0,4);const choice=pool[Math.floor(Math.random()*pool.length)]||b;
+      d.picks.push({round:c.round,overall:d.picks.length+1,member:c.member,player:choice.id});if(d.picks.length>=sequence().length)d.status="done"}toast("Draft complete. Teams are locked in.");render()}
+  if(a==="resetDraft"){d.status="setup";d.picks=[];d.order=[];d.reveal=0;d.randOrders={};S.swaps=[];resetT();render()}
+  if(a==="startDraft"&&d.status==="setup"){d.order=shuffle(MEMBERS.map(m=>m.id));d.randOrders={};d.reveal=0;d.status="drawing";render();
+    const step=()=>{if(d.status!=="drawing")return;d.reveal++;if(d.reveal>=MEMBERS.length){render();setTimeout(()=>{if(d.status!=="drawing")return;d.status="live";d.clockStart=Date.now();toast(`Order drawn. ${MEMBERS[d.order[0]].name} is on the clock.`);render()},1100)}else{if(S.tab==="draft")render();setTimeout(step,200)}};
+    setTimeout(step,300)}
+  if(a==="simDay")simDay();
+  if(a==="resetTourney"){resetT();render()}
+  if(a==="cancelSwap"){S.swapUI=null;render()}
+  if(a==="night")gameNight();
+  if(a==="trMore"){S.tr.n+=50;fillTracker()}
+  if(a==="toggleInj"){const p=players[+ds.id];p.inj=p.inj?null:{status:"Out",note:"Flagged by commissioner",updated:"Today"};toast(p.inj?`${p.name} marked injured`:`${p.name} cleared`);render();openPlayer(p.id)}
+});
+function resetT(){players.forEach(p=>{p.tPts=0;p.tGp=0;p.tLog=[]});teams.forEach(t=>t.alive=true);S.swaps=[];S.swapUI=null;initTourney()}
+document.addEventListener("input",e=>{
+  if(e.target.id==="bq"){S.board.q=e.target.value;fillBoard()}
+  if(e.target.id==="aq")fillAvail();
+  if(e.target.id==="tq"){S.tr.q=e.target.value;S.tr.n=50;fillTracker()}
+});
+document.addEventListener("change",e=>{
+  const s=S.draft.settings,id=e.target.id;
+  if(id==="sRounds"){s.rounds=Math.max(1,Math.min(8,+e.target.value||5));s.snake=Math.min(s.snake,s.rounds);S.draft.randOrders={};render()}
+  if(id==="sSnake"){s.snake=Math.max(0,Math.min(s.rounds,+e.target.value||0));S.draft.randOrders={};render()}
+  if(id==="sTimer"){s.timer=Math.max(0,+e.target.value||0)}
+  if(id==="sHard"){s.hard=e.target.checked}
+  if(id==="tconf"){S.tr.conf=e.target.value;S.tr.n=50;render()}
+  if(id==="tstat"){S.tr.stat=e.target.value;render()}
+  if(id==="bsort"){S.board.sort=e.target.value;S.board.dir=-1;render()}
+  if(id==="roleSel"){S.role=e.target.value;S.swapUI=null;render()}
+});
+document.addEventListener("submit",e=>{
+  e.preventDefault();
+  if(e.target.id==="inviteForm"){const v=$("#invEmails").value.split(/[,\s]+/).filter(x=>/.+@.+\..+/.test(x));if(!v.length){toast("Enter at least one email address");return}
+    S.league.invited.push(...v);toast(`Invites sent to ${v.length} ${v.length===1?"person":"people"}`);render()}
+  if(e.target.id==="createForm"){const n=$("#cName").value.trim()||"New league";S.leagues.push({name:n,role:"Commissioner",size:1});toast(`${n} created. Share the invite link to add people.`);render()}
+  if(e.target.id==="signinForm"){S.signinSent=true;render()}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer()});
+render();
+</script>
+
+</body>
+</html>
